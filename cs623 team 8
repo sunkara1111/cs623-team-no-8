@@ -1,0 +1,624 @@
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": 1,
+   "id": "1641d56a",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Requirement already satisfied: psycopg2 in c:\\users\\aravi\\anaconda3\\lib\\site-packages (2.9.9)\n",
+      "Note: you may need to restart the kernel to use updated packages.\n"
+     ]
+    }
+   ],
+   "source": [
+    "pip install -U psycopg2"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 2,
+   "id": "9af47889",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import psycopg2\n",
+    "from psycopg2 import sql\n",
+    "\n",
+    "# Function to execute SQL commands within a transaction\n",
+    "import psycopg2\n",
+    "from psycopg2 import sql\n",
+    "from psycopg2.extensions import ISOLATION_LEVEL_SERIALIZABLE\n",
+    "\n",
+    "\n",
+    "\n",
+    "def execute_transaction(sql_commands):\n",
+    "    connection = psycopg2.connect(\n",
+    "        host=\"localhost\",\n",
+    "        \n",
+    "        database=\"cs623\",\n",
+    "        user=\"postgres\",\n",
+    "        password=\"aravind.123\"\n",
+    "    )\n",
+    "    connection.autocommit = False \n",
+    "    cursor = connection.cursor()\n",
+    "\n",
+    "    try:\n",
+    "        connection.set_isolation_level(ISOLATION_LEVEL_SERIALIZABLE)\n",
+    "        cursor.execute(\"SAVEPOINT critical_operations\")\n",
+    "\n",
+    "        for sql_command in sql_commands:\n",
+    "            cursor.execute(sql_command)\n",
+    "\n",
+    "        connection.commit()  \n",
+    "        print(\"Transaction successful\")\n",
+    "    except Exception as e:\n",
+    "        print(f\"Transaction failed: {e}\")\n",
+    "\n",
+    "        connection.rollback_to_savepoint(\"critical_operations\")\n",
+    "        print(\"Rolled back to savepoint\")\n",
+    "\n",
+    "    finally:\n",
+    "        cursor.close()\n",
+    "        connection.close()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 3,
+   "id": "2894852d",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Transaction successful\n"
+     ]
+    }
+   ],
+   "source": [
+    "# Drop tables if they already exist\n",
+    "drop_tables = \"\"\"\n",
+    "DROP TABLE IF EXISTS Stock;\n",
+    "DROP TABLE IF EXISTS Depot;\n",
+    "DROP TABLE IF EXISTS Product;\n",
+    "\"\"\"\n",
+    "\n",
+    "execute_transaction([drop_tables])"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 4,
+   "id": "a3831f23",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Transaction successful\n",
+      "Transaction successful\n",
+      "Transaction successful\n"
+     ]
+    }
+   ],
+   "source": [
+    "create_product_table = \"\"\"CREATE TABLE IF NOT EXISTS Product (\n",
+    "    prodid VARCHAR(10),\n",
+    "    name VARCHAR(25),\n",
+    "    price DECIMAL\n",
+    ");\"\"\"\n",
+    "execute_transaction([create_product_table])\n",
+    "create_depot_table=\"\"\"CREATE TABLE IF NOT EXISTS Depot (\n",
+    "    depid VARCHAR(10),\n",
+    "    addr VARCHAR(30),\n",
+    "    volume DECIMAL\n",
+    ");\"\"\"\n",
+    "execute_transaction([create_depot_table])\n",
+    "\n",
+    "create_stock_table=\"\"\"CREATE TABLE IF NOT EXISTS Stock (\n",
+    "    prodid VARCHAR(10),\n",
+    "    depid VARCHAR(10),\n",
+    "    quantity DECIMAL\n",
+    ");\"\"\"\n",
+    "execute_transaction([create_stock_table])"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 5,
+   "id": "fe8bf141",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Transaction successful\n"
+     ]
+    }
+   ],
+   "source": [
+    "# Add primary and foreign keys using ALTER TABLE\n",
+    "alter_table_commands = \"\"\"\n",
+    "ALTER TABLE Product \n",
+    "    ADD PRIMARY KEY (prodid);\n",
+    "\n",
+    "ALTER TABLE Product \n",
+    "    ADD CONSTRAINT ck_product_price CHECK (price > 0);\n",
+    "\n",
+    "ALTER TABLE Depot \n",
+    "    ADD PRIMARY KEY (depid);\n",
+    "\n",
+    "ALTER TABLE Stock\n",
+    "    ADD PRIMARY KEY (prodid, depid);\n",
+    "\n",
+    "ALTER TABLE Stock\n",
+    "    ADD CONSTRAINT fk_prodid FOREIGN KEY (prodid) REFERENCES Product (prodid);\n",
+    "\n",
+    "ALTER TABLE Stock\n",
+    "    ADD CONSTRAINT fk_stock_depot FOREIGN KEY (depid) REFERENCES Depot (depid);\n",
+    "\"\"\"\n",
+    "\n",
+    "# Execute ALTER TABLE commands\n",
+    "execute_transaction([alter_table_commands])"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 6,
+   "id": "0b8dc834",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Transaction successful\n",
+      "Transaction successful\n",
+      "Transaction successful\n"
+     ]
+    }
+   ],
+   "source": [
+    "# Insert initial values\n",
+    "insert_product_values = \"\"\"\n",
+    "INSERT INTO Product VALUES \n",
+    "    ('P1', 'Tape', 2.5),\n",
+    "    ('P2', 'TV', 250),\n",
+    "    ('P3', 'Vcr', 80);\"\"\"\n",
+    "\n",
+    "insert_depot_values=\"\"\"INSERT INTO Depot VALUES \n",
+    "    ('d1', 'New York', 9000),\n",
+    "    ('d2', 'Syracuse', 6000),\n",
+    "    ('d4', 'New York', 2000);\"\"\"\n",
+    "\n",
+    "insert_Stock_values= \"\"\"INSERT INTO Stock VALUES \n",
+    "    ('P1', 'd1', 1000),\n",
+    "    ('P1', 'd2', -100),\n",
+    "    ('P1', 'd4', 1200),\n",
+    "    ('P3', 'd1', 3000),\n",
+    "    ('P3', 'd4', 2000),\n",
+    "    ('P2', 'd4', 1500),\n",
+    "    ('P2', 'd1', -400),\n",
+    "    ('P2', 'd2', 2000);\n",
+    "\"\"\"\n",
+    "\n",
+    "execute_transaction([insert_product_values])\n",
+    "execute_transaction([insert_depot_values])\n",
+    "execute_transaction([insert_Stock_values])"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 7,
+   "id": "b4c63257",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Transaction successful\n"
+     ]
+    }
+   ],
+   "source": [
+    "select_table = \"\"\"select * from product;\n",
+    "select * from depot;\n",
+    "select * from Stock;\"\"\"\n",
+    "execute_transaction([select_table])"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 8,
+   "id": "23687037",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "('P1', 'Tape', Decimal('2.5'))\n",
+      "('P2', 'TV', Decimal('250'))\n",
+      "('P3', 'Vcr', Decimal('80'))\n",
+      "********************************************************\n",
+      "('d1', 'New York', Decimal('9000'))\n",
+      "('d2', 'Syracuse', Decimal('6000'))\n",
+      "('d4', 'New York', Decimal('2000'))\n",
+      "********************************************************\n",
+      "('P1', 'd1', Decimal('1000'))\n",
+      "('P1', 'd2', Decimal('-100'))\n",
+      "('P1', 'd4', Decimal('1200'))\n",
+      "('P3', 'd1', Decimal('3000'))\n",
+      "('P3', 'd4', Decimal('2000'))\n",
+      "('P2', 'd4', Decimal('1500'))\n",
+      "('P2', 'd1', Decimal('-400'))\n",
+      "('P2', 'd2', Decimal('2000'))\n"
+     ]
+    }
+   ],
+   "source": [
+    "#We can view the list of values which are present in the tables\n",
+    "connection = psycopg2.connect(host=\"localhost\",database=\"cs623\",user=\"postgres\",password=\"aravind.123\")\n",
+    "connection.autocommit = False  # Turn off autocommit to manage transactions\n",
+    "cursor = connection.cursor()\n",
+    "cursor.execute(\"\"\"select * from product;\"\"\")\n",
+    "for table in cursor.fetchall():\n",
+    "    print(table)\n",
+    "print(\"********************************************************\")\n",
+    "cursor.execute(\"\"\"select * from depot;\"\"\")\n",
+    "for table in cursor.fetchall():\n",
+    "    print(table)\n",
+    "print(\"********************************************************\")\n",
+    "cursor.execute(\"\"\"select * from Stock;\"\"\")\n",
+    "for table in cursor.fetchall():\n",
+    "    print(table)\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 9,
+   "id": "5604ce80",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "transaction_1 =\"\"\" \n",
+    "ALTER TABLE Stock DROP CONSTRAINT IF EXISTS fk_prodid;\n",
+    "DELETE FROM Stock WHERE prodid = 'P1';\n",
+    "DELETE FROM Product WHERE prodid = 'P1';\n",
+    "ALTER TABLE Stock ADD CONSTRAINT fk_prodid FOREIGN KEY (prodid) REFERENCES Product (prodid) DEFERRABLE INITIALLY IMMEDIATE;\n",
+    "commit;\"\"\"\n",
+    "cursor.execute(transaction_1)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 10,
+   "id": "f234176a",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "('P2', 'TV', Decimal('250'))\n",
+      "('P3', 'Vcr', Decimal('80'))\n",
+      "********************************************************\n",
+      "('P3', 'd1', Decimal('3000'))\n",
+      "('P3', 'd4', Decimal('2000'))\n",
+      "('P2', 'd4', Decimal('1500'))\n",
+      "('P2', 'd1', Decimal('-400'))\n",
+      "('P2', 'd2', Decimal('2000'))\n"
+     ]
+    }
+   ],
+   "source": [
+    "#We can view the list of values which are present in the tables\n",
+    "cursor.execute(\"\"\"select * from product;\"\"\")\n",
+    "for table in cursor.fetchall():\n",
+    "    print(table)\n",
+    "print(\"********************************************************\")\n",
+    "cursor.execute(\"\"\"select * from Stock;\"\"\")\n",
+    "for table in cursor.fetchall():\n",
+    "    print(table)\n",
+    "\n",
+    "#We can view that the rows with product P1 has been removed from both product and Stock tables"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 11,
+   "id": "d0984c9f",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "transaction_2 = \"\"\"ALTER TABLE Stock DROP CONSTRAINT IF EXISTS fk_stock_depot;\n",
+    "DELETE FROM Stock WHERE depid = 'd1';\n",
+    "DELETE FROM Depot WHERE depid = 'd1';\n",
+    "ALTER TABLE Stock ADD CONSTRAINT fk_stock_depot FOREIGN KEY (depid) REFERENCES Depot (depid) DEFERRABLE INITIALLY IMMEDIATE;\n",
+    "commit;\"\"\"\n",
+    "cursor.execute(transaction_2)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 12,
+   "id": "e927c0be",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "('d2', 'Syracuse', Decimal('6000'))\n",
+      "('d4', 'New York', Decimal('2000'))\n",
+      "********************************************************\n",
+      "('P3', 'd4', Decimal('2000'))\n",
+      "('P2', 'd4', Decimal('1500'))\n",
+      "('P2', 'd2', Decimal('2000'))\n"
+     ]
+    }
+   ],
+   "source": [
+    "cursor.execute(\"\"\"select * from depot;\"\"\")\n",
+    "for table in cursor.fetchall():\n",
+    "    print(table)\n",
+    "print(\"********************************************************\")\n",
+    "cursor.execute(\"\"\"select * from Stock;\"\"\")\n",
+    "for table in cursor.fetchall():\n",
+    "    print(table)\n",
+    "# We can observ that the records with d1 are removed from depot and stock tables"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 13,
+   "id": "ea60ee89",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "transaction_3 = \"\"\"ALTER TABLE Stock DROP CONSTRAINT IF EXISTS fk_prodid;\n",
+    "UPDATE Product SET prodid = 'pp1' WHERE prodid = 'P1';\n",
+    "UPDATE Stock SET prodid = 'pp1' WHERE prodid = 'P1';\n",
+    "ALTER TABLE Stock ADD CONSTRAINT fk_prodid FOREIGN KEY (prodid) REFERENCES Product (prodid) DEFERRABLE INITIALLY IMMEDIATE;\n",
+    "commit;\"\"\"\n",
+    "\n",
+    "# Execute Transaction 3\n",
+    "cursor.execute(transaction_3)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 14,
+   "id": "9a744452",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "('P2',)\n",
+      "('P3',)\n"
+     ]
+    }
+   ],
+   "source": [
+    "cursor.execute(\"\"\"SELECT prodid from product;\"\"\")\n",
+    "for table in cursor.fetchall():\n",
+    "    print(table)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 15,
+   "id": "a5822d5a",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Transaction 4: Update Depot d1 to dd1\n",
+    "transaction_4 =\"\"\"ALTER TABLE Stock DROP CONSTRAINT IF EXISTS fk_stock_depot;\n",
+    "    UPDATE Depot SET depid = 'dd1' WHERE depid = 'd1';\n",
+    "    UPDATE Stock SET depid = 'dd1' WHERE depid = 'd1';\n",
+    "    ALTER TABLE Stock ADD CONSTRAINT fk_stock_depot FOREIGN KEY (depid) REFERENCES Depot (depid) DEFERRABLE INITIALLY IMMEDIATE;\n",
+    "    commit;\"\"\"\n",
+    "\n",
+    "# Execute Transaction 4\n",
+    "cursor.execute(transaction_4)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 16,
+   "id": "92c35a13",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "('d2',)\n",
+      "('d4',)\n"
+     ]
+    }
+   ],
+   "source": [
+    "cursor.execute(\"\"\"SELECT depid from depot;\"\"\")\n",
+    "for table in cursor.fetchall():\n",
+    "    print(table)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 17,
+   "id": "dd622cc0",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Transaction 5: Insert Product P100 and Stock P100, d2\n",
+    "transaction_5 =\"\"\"\n",
+    "    ALTER TABLE Stock DROP CONSTRAINT IF EXISTS fk_prodid;\n",
+    "    ALTER TABLE Stock DROP CONSTRAINT IF EXISTS fk_stock_depot;\n",
+    "    INSERT INTO Product VALUES ('p100', 'cd', 5);\n",
+    "    INSERT INTO Stock VALUES ('p100', 'd2', 50);\n",
+    "    ALTER TABLE Stock ADD CONSTRAINT fk_prodid FOREIGN KEY (prodid) REFERENCES Product (prodid) DEFERRABLE INITIALLY IMMEDIATE;\n",
+    "    ALTER TABLE Stock ADD CONSTRAINT fk_stock_depot FOREIGN KEY (depid) REFERENCES Depot (depid) DEFERRABLE INITIALLY IMMEDIATE;\n",
+    "    commit;\"\"\"\n",
+    "\n",
+    "\n",
+    "# Execute Transaction 5\n",
+    "cursor.execute(transaction_5)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 18,
+   "id": "4a23f5b0",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "('P2', 'TV', Decimal('250'))\n",
+      "('P3', 'Vcr', Decimal('80'))\n",
+      "('p100', 'cd', Decimal('5'))\n",
+      "********************************************************\n",
+      "('P3', 'd4', Decimal('2000'))\n",
+      "('P2', 'd4', Decimal('1500'))\n",
+      "('P2', 'd2', Decimal('2000'))\n",
+      "('p100', 'd2', Decimal('50'))\n"
+     ]
+    }
+   ],
+   "source": [
+    "cursor.execute(\"\"\"select * from product;\"\"\")\n",
+    "for table in cursor.fetchall():\n",
+    "    print(table)\n",
+    "print(\"********************************************************\")\n",
+    "cursor.execute(\"\"\"select * from Stock;\"\"\")\n",
+    "for table in cursor.fetchall():\n",
+    "    print(table)\n",
+    "\n",
+    "# we can view that product p100 added to both product and stock table"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 19,
+   "id": "96453edc",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Transaction 6: Insert depot d100 and Stock d100, d2\n",
+    "transaction_6 = \"\"\"\n",
+    "    ALTER TABLE Stock DROP CONSTRAINT IF EXISTS fk_prodid;\n",
+    "    ALTER TABLE Stock DROP CONSTRAINT IF EXISTS fk_stock_depot;\n",
+    "    INSERT INTO depot VALUES ('d100', 'Chicago', 100);\n",
+    "    ALTER TABLE Stock ADD CONSTRAINT fk_prodid FOREIGN KEY (prodid) REFERENCES Product (prodid) DEFERRABLE INITIALLY IMMEDIATE;\n",
+    "    ALTER TABLE Stock ADD CONSTRAINT fk_stock_depot FOREIGN KEY (depid) REFERENCES Depot (depid) DEFERRABLE INITIALLY IMMEDIATE;\n",
+    "    commit;\"\"\"\n",
+    "\n",
+    "\n",
+    "# Execute Transaction 6\n",
+    "cursor.execute(transaction_6)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 20,
+   "id": "8068df6c",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "transaction_6_2=\"\"\"BEGIN TRANSACTION;\n",
+    "\n",
+    "-- Check if product p1 exists\n",
+    "INSERT INTO Stock (prodid, depid, quantity)\n",
+    "SELECT 'p1', 'd100', 100\n",
+    "WHERE EXISTS (SELECT 1 FROM Product WHERE prodid = 'p1');\n",
+    "\n",
+    "-- If product p1 doesn't exist, insert it into Product table with a non-zero default quantity\n",
+    "INSERT INTO Product (prodid, name,price)\n",
+    "SELECT 'p1', 'Product1', 1 -- Adjust the default quantity to comply with constraints\n",
+    "WHERE NOT EXISTS (SELECT 1 FROM Product WHERE prodid = 'p1');\n",
+    "\n",
+    "-- Add stock to depot d100 for product p1\n",
+    "INSERT INTO Stock (prodid, depid, quantity)\n",
+    "SELECT 'p1', 'd100', 100;\n",
+    " \n",
+    "COMMIT;\n",
+    "\"\"\"\n",
+    "cursor.execute(transaction_6_2)\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 21,
+   "id": "67f8d386",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "('d2', 'Syracuse', Decimal('6000'))\n",
+      "('d4', 'New York', Decimal('2000'))\n",
+      "('d100', 'Chicago', Decimal('100'))\n",
+      "********************************************************\n",
+      "('P3', 'd4', Decimal('2000'))\n",
+      "('P2', 'd4', Decimal('1500'))\n",
+      "('P2', 'd2', Decimal('2000'))\n",
+      "('p100', 'd2', Decimal('50'))\n",
+      "('p1', 'd100', Decimal('100'))\n"
+     ]
+    }
+   ],
+   "source": [
+    "cursor.execute(\"\"\"select * from depot;\"\"\")\n",
+    "for table in cursor.fetchall():\n",
+    "    print(table)\n",
+    "print(\"********************************************************\")\n",
+    "cursor.execute(\"\"\"select * from Stock;\"\"\")\n",
+    "for table in cursor.fetchall():\n",
+    "    print(table)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "99567ae8",
+   "metadata": {},
+   "source": [
+    "We can observe that the new rows have been inserted into Stock table"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3 (ipykernel)",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.11.5"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
